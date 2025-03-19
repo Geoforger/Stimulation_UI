@@ -7,9 +7,6 @@ class AppUI:
         self.master = master
         master.title("Test Stimulator App") 
 
-        # Initialize serial communication
-        self.uart = UART_COMMS()
-
         # UI Display variables
         self.stim_amplitude = 0.00
         self.pulse_width = 0.00
@@ -32,27 +29,31 @@ class AppUI:
         self.nerve_impedance_label.grid(row=2, column=2, padx=10, pady=10)
 
         # UI Buttons
-        self.stim_up_but = Button(master, text="+", command=self.stim_amp_up, width=10, height=2)
+        self.stim_up_but = Button(master, text="+", command=self.stim_amp_up, width=10, height=2, state=DISABLED)
         self.stim_up_but.grid(row=1, column=0, padx=10, pady=10)
 
-        self.stim_down_but = Button(master, text="-", command=self.stim_amp_down, width=10, height=2)
+        self.stim_down_but = Button(master, text="-", command=self.stim_amp_down, width=10, height=2, state=DISABLED)
         self.stim_down_but.grid(row=1, column=1, padx=10, pady=10)
 
-        self.pulse_up_but = Button(master, text="+", command=self.pulse_width_up, width=10, height=2)
+        self.pulse_up_but = Button(master, text="+", command=self.pulse_width_up, width=10, height=2, state=DISABLED)
         self.pulse_up_but.grid(row=3, column=0, padx=10, pady=10)
 
-        self.pulse_down_but = Button(master, text="-", command=self.pulse_width_down, width=10, height=2)
+        self.pulse_down_but = Button(master, text="-", command=self.pulse_width_down, width=10, height=2, state=DISABLED)
         self.pulse_down_but.grid(row=3, column=1, padx=10, pady=10)
 
-        self.STOP_but = Button(master, text="STOP", command=self.STOP, width=10, height=2)
+        self.STOP_but = Button(master, text="STOP", command=self.STOP, width=10, height=2, state=DISABLED)
         self.STOP_but.grid(row=4, column=2, rowspan=3, padx=10, pady=10)
 
+        # Reconnect button
+        self.reconnect_but = Button(master, text="Reconnect", command=self.initialize_serial, state=NORMAL)
+        self.reconnect_but.grid(row=6, column=2, rowspan=3, padx=10, pady=10)
+
         # Entry boxes for manual input
-        self.stim_amplitude_entry = Entry(master)
+        self.stim_amplitude_entry = Entry(master, state=DISABLED)
         self.stim_amplitude_entry.grid(row=1, column=2, padx=10, pady=10)
         self.stim_amplitude_entry.bind("<Return>", self.update_stim_amplitude)
 
-        self.pulse_width_entry = Entry(master)
+        self.pulse_width_entry = Entry(master, state=DISABLED)
         self.pulse_width_entry.grid(row=3, column=2, padx=10, pady=10)
         self.pulse_width_entry.bind("<Return>", self.update_pulse_width)
 
@@ -61,20 +62,37 @@ class AppUI:
         self.triggers_label.grid(row=5, column=0, columnspan=2, padx=10, pady=10)
 
         self.switch_var = IntVar()
-        self.triggers_switch = Checkbutton(master, text="", variable=self.switch_var, command=self.toggle_switch)
+        self.triggers_switch = Checkbutton(master, text="", variable=self.switch_var, command=self.toggle_trigger, state=DISABLED)
         self.triggers_switch.grid(row=6, column=0, columnspan=2, padx=10, pady=0)
 
         self.recording_switch_var = IntVar()
-        self.recording_switch = Checkbutton(master, text="Recording - Stimulation", variable=self.recording_switch_var, command=self.toggle_recording)
+        self.recording_switch = Checkbutton(master, text="Recording - Stimulation", variable=self.recording_switch_var, command=self.toggle_recording, state=DISABLED)
         self.recording_switch.grid(row=7, column=0, columnspan=2, padx=10, pady=10)
 
         self.pc_user_switch_var = IntVar()
-        self.pc_user_switch = Checkbutton(master, text="PC - User", variable=self.pc_user_switch_var, command=self.toggle_pc_user)
+        self.pc_user_switch = Checkbutton(master, text="PC - User", variable=self.pc_user_switch_var, command=self.toggle_pc_user, state=DISABLED)
         self.pc_user_switch.grid(row=8, column=0, columnspan=2, padx=10, pady=10)
 
         # Event log
-        self.event_log = Text(master, width=40, height=20)
-        self.event_log.grid(row=0, column=3, rowspan=9, padx=10, pady=10)
+        self.event_log = Text(master, width=80, height=20)
+        self.event_log.grid(row=0, column=3, rowspan=14, padx=10, pady=10)
+
+        # Initialize serial communication
+        self.uart = None
+        self.pc_usr_toggle = 0
+        self.initialize_serial()
+
+    def initialize_serial(self):
+        try:
+            self.uart = UART_COMMS()
+            self.pc_usr_toggle = self.uart.comm_state
+            self.enable_ui()
+            self.reconnect_but.config(state=DISABLED)
+            self.log_event("Serial connection established")
+        except Exception as e:
+            self.log_event(f"Failed to establish serial connection: {e}")
+            self.disable_ui()
+            self.reconnect_but.config(state=NORMAL)
 
     def log_event(self, event):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -104,15 +122,21 @@ class AppUI:
         self.log_event(f"Decreased Pulse Width to {self.pulse_width:.2f}")
 
     def STOP(self):
+        if self.uart:
+            self.uart.STOP()
         self.log_event("STIMULATION STOPPED")
 
-    def toggle_switch(self):
+    def toggle_trigger(self):
+        if self.uart:
+            self.uart.toggle_trigger()
         if self.switch_var.get():
             self.log_event("INTERNAL TRIGGERS")
         else:
             self.log_event("EXTERNAL TRIGGERS")
 
     def toggle_recording(self):
+        if self.uart:
+            self.uart.toggle_recording()
         if self.recording_switch_var.get():
             self.log_event("Recording Mode Enabled")
             self.recording_ui()
@@ -121,6 +145,9 @@ class AppUI:
             self.stimulation_ui()
 
     def toggle_pc_user(self):
+        if self.uart:
+            self.uart.toggle_PC_usr()
+        self.pc_usr_toggle ^= 1
         if self.pc_user_switch_var.get():
             self.log_event("PC Mode Enabled")
             self.pc_mode_ui()
@@ -204,6 +231,30 @@ class AppUI:
                 self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
         except ValueError:
             self.log_event("Invalid input for Pulse Width")
+
+    def disable_ui(self):
+        self.stim_up_but.config(state=DISABLED)
+        self.stim_down_but.config(state=DISABLED)
+        self.pulse_up_but.config(state=DISABLED)
+        self.pulse_down_but.config(state=DISABLED)
+        self.stim_amplitude_entry.config(state=DISABLED)
+        self.pulse_width_entry.config(state=DISABLED)
+        self.triggers_switch.config(state=DISABLED)
+        self.recording_switch.config(state=DISABLED)
+        self.pc_user_switch.config(state=DISABLED)
+        self.STOP_but.config(state=DISABLED)
+
+    def enable_ui(self):
+        self.stim_up_but.config(state=NORMAL)
+        self.stim_down_but.config(state=NORMAL)
+        self.pulse_up_but.config(state=NORMAL)
+        self.pulse_down_but.config(state=NORMAL)
+        self.stim_amplitude_entry.config(state=NORMAL)
+        self.pulse_width_entry.config(state=NORMAL)
+        self.triggers_switch.config(state=NORMAL)
+        self.recording_switch.config(state=NORMAL)
+        self.pc_user_switch.config(state=NORMAL)
+        self.STOP_but.config(state=NORMAL)
 
 if __name__ == "__main__":
     root = Tk()

@@ -23,8 +23,8 @@ If you are looking to install to your own Raspberry Pi, without reformatting, fo
 
 1. Clone the repository:
    ```
-   git clone <repository-url>
-   cd my-python-app
+   git clone https://github.com/Geoforger/Stimulation_UI/tree/main/stimulator_ui
+   cd stimulator_ui
    ```
 
 2. Install the required dependencies:
