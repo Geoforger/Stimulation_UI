@@ -79,7 +79,7 @@ class AppUI:
 
         # Initialize serial communication
         self.uart = None
-        self.pc_usr_toggle = 0
+        self.pc_usr_toggle = 1
         self.initialize_serial()
 
     def initialize_serial(self):
@@ -89,6 +89,7 @@ class AppUI:
             self.enable_ui()
             self.reconnect_but.config(state=DISABLED)
             self.log_event("Serial connection established")
+            self.uart.start_polling(self.update_from_serial)
         except Exception as e:
             self.log_event(f"Failed to establish serial connection: {e}")
             self.disable_ui()
@@ -123,8 +124,11 @@ class AppUI:
 
     def STOP(self):
         if self.uart:
-            self.uart.STOP()
-        self.log_event("STIMULATION STOPPED")
+            ack = self.uart.STOP()
+        if ack:
+            self.log_event("STIMULATION STOPPED")
+        else:
+            self.log_event("STOP ACK not received")
 
     def toggle_trigger(self):
         if self.uart:
@@ -146,14 +150,17 @@ class AppUI:
 
     def toggle_pc_user(self):
         if self.uart:
-            self.uart.toggle_PC_usr()
-        self.pc_usr_toggle ^= 1
-        if self.pc_user_switch_var.get():
-            self.log_event("PC Mode Enabled")
-            self.pc_mode_ui()
+            ack = self.uart.toggle_PC_usr()
+        if ack:
+            self.pc_usr_toggle ^= 1
+            if self.pc_user_switch_var.get():
+                self.log_event("PC Mode Enabled")
+                self.pc_mode_ui()
+            else:
+                self.log_event("User Mode Enabled")
+                self.user_mode_ui()
         else:
-            self.log_event("User Mode Enabled")
-            self.user_mode_ui()
+            self.log_event("User Toggle ACK not received")
 
     def recording_ui(self):
         self.stim_up_but.config(state=DISABLED)
@@ -184,7 +191,6 @@ class AppUI:
         self.pulse_width_entry.config(state=DISABLED)
         self.triggers_switch.config(state=DISABLED)
         self.recording_switch.config(state=DISABLED)
-        self.update_from_serial()
 
     def user_mode_ui(self):
         self.stim_up_but.config(state=NORMAL)
@@ -196,19 +202,22 @@ class AppUI:
         self.triggers_switch.config(state=NORMAL)
         self.recording_switch.config(state=NORMAL)
 
-    def update_from_serial(self):
-        try:
-            while self.pc_user_switch_var.get():
-                data = self.uart.read(32).decode('utf-8').strip()
-                if data:
-                    stim_amp, pulse_width = map(float, data.split(','))
+    def update_from_serial(self, stim_amp, pulse_width, error=None, toggle=False):
+        if error:
+            self.log_event(f"Error reading from serial: {error}")
+        elif toggle:
+            self.toggle_pc_user()
+        else:
+            if self.pc_usr_toggle == 0:
+                if stim_amp is not None:
                     self.stim_amplitude = stim_amp
-                    self.pulse_width = pulse_width
                     self.stim_amplitude_var.set(f"Stim Amplitude: {self.stim_amplitude:.2f}uA")
+                if pulse_width is not None:
+                    self.pulse_width = pulse_width
                     self.pulse_width_var.set(f"Pulse Width: {self.pulse_width:.2f}")
-                    self.log_event(f"Updated from PC: Stim Amplitude: {self.stim_amplitude:.2f}uA, Pulse Width: {self.pulse_width:.2f}")
-        except Exception as e:
-            self.log_event(f"Error reading from serial: {e}")
+                self.log_event(f"Updated from PC: Stim Amplitude: {self.stim_amplitude:.2f}uA, Pulse Width: {self.pulse_width:.2f}")
+            else:
+                self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
 
     def update_stim_amplitude(self, event):
         try:
@@ -216,7 +225,7 @@ class AppUI:
             self.stim_amplitude = value
             self.stim_amplitude_var.set(f"Stim Amplitude: {self.stim_amplitude:.2f}uA")
             self.log_event(f"Set Stimulation Amplitude to {self.stim_amplitude:.2f}uA")
-            if self.pc_user_switch_var.get():
+            if self.pc_usr_toggle == 1:
                 self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
         except ValueError:
             self.log_event("Invalid input for Stimulation Amplitude")
@@ -227,7 +236,7 @@ class AppUI:
             self.pulse_width = value
             self.pulse_width_var.set(f"Pulse Width: {self.pulse_width:.2f}")
             self.log_event(f"Set Pulse Width to {self.pulse_width:.2f}")
-            if self.pc_user_switch_var.get():
+            if self.pc_usr_toggle == 1:
                 self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
         except ValueError:
             self.log_event("Invalid input for Pulse Width")
@@ -256,7 +265,13 @@ class AppUI:
         self.pc_user_switch.config(state=NORMAL)
         self.STOP_but.config(state=NORMAL)
 
+    def close(self):
+        if self.uart:
+            self.uart.close()
+        self.master.destroy()
+
 if __name__ == "__main__":
     root = Tk()
     app = AppUI(root)
+    root.protocol("WM_DELETE_WINDOW", app.close)
     root.mainloop()
