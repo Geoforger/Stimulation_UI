@@ -2,7 +2,7 @@ import serial
 import threading
 
 class UART_COMMS():
-    def __init__(self, port='/dev/serial0', baudrate=9600):
+    def __init__(self, port='/dev/ttyACM0', baudrate=9600):
         self.port = port
         self.baudrate = baudrate
         self.comm_state = 1     # 0: User Mode, 1: PC Mode
@@ -98,3 +98,4 @@ class UART_COMMS():
     def close(self):
         self.stop_polling()
         self.ser.close()
+

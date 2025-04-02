@@ -1,6 +1,8 @@
 from tkinter import Tk, Button, Checkbutton, IntVar, Label, StringVar, Text, Entry, END, DISABLED, NORMAL
 from datetime import datetime
 from stim_io import UART_COMMS
+import serial
+import serial.tools.list_ports
 
 class AppUI:
     def __init__(self, master):
@@ -84,7 +86,8 @@ class AppUI:
 
     def initialize_serial(self):
         try:
-            self.uart = UART_COMMS()
+            port = self.find_arduino_port()
+            self.uart = UART_COMMS(port=port)
             self.pc_usr_toggle = self.uart.comm_state
             self.enable_ui()
             self.reconnect_but.config(state=DISABLED)
@@ -269,6 +272,16 @@ class AppUI:
         if self.uart:
             self.uart.close()
         self.master.destroy()
+
+    def find_arduino_port(self):
+        # List all available ports
+        ports = list(serial.tools.list_ports.comports())
+        for port in ports:
+            # Check if "Arduino" appears in the description
+            # or if the device name matches common Arduino naming conventions.
+            if "Arduino" in port.description or port.device.startswith("/dev/ttyACM") or port.device.startswith("/dev/ttyUSB"):
+                return port.device
+        return None
 
 if __name__ == "__main__":
     root = Tk()
