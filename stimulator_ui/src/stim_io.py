@@ -22,8 +22,7 @@ class UART_COMMS():
         return self.ser.read(size)
     
     def readline(self):
-        with self.lock:
-            return self.ser.readline()
+        return self.ser.readline()
     
     def STOP(self, attempts=100):
         msg = b"<STOP>"
