@@ -290,6 +290,7 @@ class AppUI:
         self.pc_user_switch.config(state=NORMAL)
         self.STOP_but.config(state=NORMAL)
         self.done_but.config(state=NORMAL)
+        self.poll_status_but.config(state=NORMAL)
 
     def close(self):
         if self.uart:
