@@ -1,6 +1,7 @@
 from tkinter import Tk, Button, Checkbutton, IntVar, Label, StringVar, Text, Entry, END, DISABLED, NORMAL
 from datetime import datetime
 from stim_io import UART_COMMS
+from user_io import USER_COMMS
 import serial
 import serial.tools.list_ports
 
@@ -12,6 +13,8 @@ class AppUI:
         # UI Display variables
         self.stim_amplitude = 0.00
         self.pulse_width = 0.00
+        self.pending_stim_amplitude = 0.00
+        self.pending_pulse_width = 0.00
         self.nerve_impedance = 0.00
 
         # Display Labels
@@ -43,12 +46,19 @@ class AppUI:
         self.pulse_down_but = Button(master, text="-", command=self.pulse_width_down, width=10, height=2, state=DISABLED)
         self.pulse_down_but.grid(row=3, column=1, padx=10, pady=10)
 
+        self.done_but = Button(master, text="Done", command=self.apply_settings, width=10, height=2)
+        self.done_but.grid(row=4, column=0, columnspan=2, padx=10, pady=10)
+
         self.STOP_but = Button(master, text="STOP", command=self.STOP, width=10, height=2, state=DISABLED)
         self.STOP_but.grid(row=4, column=2, rowspan=3, padx=10, pady=10)
 
         # Reconnect button
         self.reconnect_but = Button(master, text="Reconnect", command=self.initialize_serial, state=NORMAL)
         self.reconnect_but.grid(row=6, column=2, rowspan=3, padx=10, pady=10)
+
+        # Reconnect User Board button
+        self.reconnect_user_but = Button(master, text="Reconnect User Board", command=self.initialise_user_board, state=DISABLED)
+        self.reconnect_user_but.grid(row=7, column=2, rowspan=3, padx=10, pady=10)
 
         # Poll Status button
         self.poll_status_but = Button(master, text="Poll Status", command=self.poll_status, width=10, height=2, state=DISABLED)
@@ -87,6 +97,7 @@ class AppUI:
         self.uart = None
         self.pc_usr_toggle = 1
         self.initialize_serial()
+        self.initialise_user_board()
 
     def initialize_serial(self):
         try:
@@ -102,32 +113,50 @@ class AppUI:
             self.disable_ui()
             self.reconnect_but.config(state=NORMAL)
 
+    def initialise_user_board(self):
+        try:
+            self.user_board = USER_COMMS(port='/dev/ttyS0', baudrate=9600)
+            self.user_board_connected = True
+            self.enable_ui()
+            self.reconnect_user_but.config(state=DISABLED)
+            self.pc_user_switch.config(state=NORMAL)
+            self.log_event("User board connection established")
+        except Exception as e:
+            self.user_board_connected = False
+            self.log_event(f"Failed to establish user board connection: {e}")
+            self.reconnect_user_but.config(state=NORMAL)
+            self.pc_user_switch.config(state=DISABLED)
+
     def log_event(self, event):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.event_log.insert(END, f"{timestamp} - {event}\n")
         self.event_log.see(END)
 
     def stim_amp_up(self):
-        self.stim_amplitude += 1.00
-        self.stim_amplitude_var.set(f"Stim Amplitude: {self.stim_amplitude:.2f}uA")
-        self.log_event(f"Increased Stimulation Amplitude to {self.stim_amplitude:.2f}uA")
+        self.pending_stim_amplitude += 1.00
+        self.stim_amplitude_var.set(f"Stim Amplitude: {self.pending_stim_amplitude:.2f}uA")
 
     def stim_amp_down(self):
-        self.stim_amplitude -= 1.00
-        self.stim_amplitude_var.set(f"Stim Amplitude: {self.stim_amplitude:.2f}uA")
-        self.log_event(f"Decreased Stimulation Amplitude to {self.stim_amplitude:.2f}uA")
+        self.pending_stim_amplitude -= 1.00
+        self.stim_amplitude_var.set(f"Stim Amplitude: {self.pending_stim_amplitude:.2f}uA")
 
     def pulse_width_up(self):
-        self.pulse_width += 1.00
-        self.pulse_width_var.set(f"Pulse Width: {self.pulse_width:.2f}")
-        self.log_event(f"Increased Pulse Width to {self.pulse_width:.2f}")
+        self.pending_pulse_width += 1.00
+        self.pulse_width_var.set(f"Pulse Width: {self.pending_pulse_width:.2f}")
 
     def pulse_width_down(self):
-        self.pulse_width -= 1.00
-        if self.pulse_width < 0:
-            self.pulse_width = 0
-        self.pulse_width_var.set(f"Pulse Width: {self.pulse_width:.2f}")
-        self.log_event(f"Decreased Pulse Width to {self.pulse_width:.2f}")
+        self.pending_pulse_width -= 1.00
+        if self.pending_pulse_width < 0:
+            self.pending_pulse_width = 0
+        self.pulse_width_var.set(f"Pulse Width: {self.pending_pulse_width:.2f}")
+
+    def apply_settings(self):
+        self.stim_amplitude = self.pending_stim_amplitude
+        self.pulse_width = self.pending_pulse_width
+        self.log_event(f"Applied settings: Stim Amplitude = {self.stim_amplitude:.2f}uA\n Pulse Width = {self.pulse_width:.2f}")
+        if self.uart:
+            self.uart.set_stim_amplitude(self.stim_amplitude)
+            self.uart.set_pulse_width(self.pulse_width)
 
     def STOP(self):
         if self.uart:
@@ -156,6 +185,9 @@ class AppUI:
             self.stimulation_ui()
 
     def toggle_pc_user(self):
+        if not self.user_board_connected:
+            self.log_event("Cannot toggle PC/User mode: User board not connected")
+            return
         if self.uart:
             ack = self.uart.toggle_PC_usr()
         if ack:
@@ -242,6 +274,7 @@ class AppUI:
         self.recording_switch.config(state=DISABLED)
         self.pc_user_switch.config(state=DISABLED)
         self.STOP_but.config(state=DISABLED)
+        self.done_but.config(state=DISABLED)
 
     def enable_ui(self):
         self.stim_up_but.config(state=NORMAL)
@@ -254,6 +287,7 @@ class AppUI:
         self.recording_switch.config(state=NORMAL)
         self.pc_user_switch.config(state=NORMAL)
         self.STOP_but.config(state=NORMAL)
+        self.done_but.config(state=NORMAL)
 
     def close(self):
         if self.uart:
