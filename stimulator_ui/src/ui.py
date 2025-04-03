@@ -220,6 +220,7 @@ class AppUI:
         self.pulse_width_entry.config(state=NORMAL)
         self.triggers_switch.config(state=NORMAL)
         self.pc_user_switch.config(state=NORMAL)
+        self.poll_status_but.config(state=NORMAL)
 
     def pc_mode_ui(self):
         self.stim_up_but.config(state=DISABLED)
@@ -230,6 +231,7 @@ class AppUI:
         self.pulse_width_entry.config(state=DISABLED)
         self.triggers_switch.config(state=DISABLED)
         self.recording_switch.config(state=DISABLED)
+        self.poll_status_but.config(state=DISABLED)
 
     def user_mode_ui(self):
         self.stim_up_but.config(state=NORMAL)
