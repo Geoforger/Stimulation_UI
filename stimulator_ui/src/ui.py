@@ -50,6 +50,10 @@ class AppUI:
         self.reconnect_but = Button(master, text="Reconnect", command=self.initialize_serial, state=NORMAL)
         self.reconnect_but.grid(row=6, column=2, rowspan=3, padx=10, pady=10)
 
+        # Poll Status button
+        self.poll_status_but = Button(master, text="Poll Status", command=self.poll_status, width=10, height=2, state=DISABLED)
+        self.poll_status_but.grid(row=9, column=2, padx=10, pady=10)
+
         # Entry boxes for manual input
         self.stim_amplitude_entry = Entry(master, state=DISABLED)
         self.stim_amplitude_entry.grid(row=1, column=2, padx=10, pady=10)
@@ -86,13 +90,13 @@ class AppUI:
 
     def initialize_serial(self):
         try:
-            port = self.find_arduino_port()
-            self.uart = UART_COMMS(port=port)
+            # port = self.find_arduino_port()
+            # self.uart = UART_COMMS(port=port)
+            self.uart = UART_COMMS(port='/dev/ttyACM0', baudrate=9600)  # Currently the default port found on pi
             self.pc_usr_toggle = self.uart.comm_state
             self.enable_ui()
             self.reconnect_but.config(state=DISABLED)
             self.log_event("Serial connection established")
-            self.uart.start_polling(self.update_from_serial)
         except Exception as e:
             self.log_event(f"Failed to establish serial connection: {e}")
             self.disable_ui()
@@ -205,23 +209,6 @@ class AppUI:
         self.triggers_switch.config(state=NORMAL)
         self.recording_switch.config(state=NORMAL)
 
-    def update_from_serial(self, stim_amp, pulse_width, error=None, toggle=False):
-        if error:
-            self.log_event(f"Error reading from serial: {error}")
-        elif toggle:
-            self.toggle_pc_user()
-        else:
-            if self.pc_usr_toggle == 0:
-                if stim_amp is not None:
-                    self.stim_amplitude = stim_amp
-                    self.stim_amplitude_var.set(f"Stim Amplitude: {self.stim_amplitude:.2f}uA")
-                if pulse_width is not None:
-                    self.pulse_width = pulse_width
-                    self.pulse_width_var.set(f"Pulse Width: {self.pulse_width:.2f}")
-                self.log_event(f"Updated from PC: Stim Amplitude: {self.stim_amplitude:.2f}uA, Pulse Width: {self.pulse_width:.2f}")
-            else:
-                self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
-
     def update_stim_amplitude(self, event):
         try:
             value = float(self.stim_amplitude_entry.get())
@@ -270,6 +257,7 @@ class AppUI:
 
     def close(self):
         if self.uart:
+            self.STOP()
             self.uart.close()
         self.master.destroy()
 
@@ -282,6 +270,16 @@ class AppUI:
             if "Arduino" in port.description or port.device.startswith("/dev/ttyACM") or port.device.startswith("/dev/ttyUSB"):
                 return port.device
         return None
+    
+    def poll_status(self):
+        """Send an <ACK> message to the serial device and log the response."""
+        if self.uart:
+            try:
+                self.uart.write(b"<ACK>")
+                response = self.uart.readline().decode('utf-8').strip()
+                self.log_event(f"Poll Status Response: {response}")
+            except Exception as e:
+                self.log_event(f"Error polling status: {e}")
 
 if __name__ == "__main__":
     root = Tk()
