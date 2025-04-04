@@ -5,7 +5,6 @@ from user_io import USER_COMMS
 import serial
 import serial.tools.list_ports
 import os
-import threading
 
 class AppUI:
     def __init__(self, master):
@@ -96,7 +95,6 @@ class AppUI:
         self.event_log.grid(row=0, column=3, rowspan=14, padx=10, pady=10)
 
         # Initialize serial communication
-            # Device serial numbers
         self.control_board_serial = None
         self.user_board_serial = None
         self.uart = None
@@ -203,9 +201,10 @@ class AppUI:
         self.pulse_width_var.set(f"Pulse Width: {self.pending_pulse_width:.2f}")
 
     def apply_settings(self):
+        """Apply the pending stimulation amplitude and pulse width settings."""
         self.stim_amplitude = self.pending_stim_amplitude
         self.pulse_width = self.pending_pulse_width
-        self.log_event(f"Applied settings: Stim Amplitude = {self.stim_amplitude:.2f}uA\n Pulse Width = {self.pulse_width:.2f}")
+        self.log_event(f"Applied settings: Stim Amplitude = {self.stim_amplitude:.2f}uA, Pulse Width = {self.pulse_width:.2f}")
         if self.uart:
             self.uart.set_stim_amplitude(self.stim_amplitude)
             self.uart.set_pulse_width(self.pulse_width)
@@ -297,24 +296,20 @@ class AppUI:
         self.recording_switch.config(state=NORMAL)
 
     def update_stim_amplitude(self, event):
+        """Update the pending stimulation amplitude from the entry box."""
         try:
             value = float(self.stim_amplitude_entry.get())
-            self.stim_amplitude = value
-            self.stim_amplitude_var.set(f"Stim Amplitude: {self.stim_amplitude:.2f}uA")
-            self.log_event(f"Set Stimulation Amplitude to {self.stim_amplitude:.2f}uA")
-            if self.pc_usr_toggle == 1:
-                self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
+            self.pending_stim_amplitude = value
+            self.stim_amplitude_var.set(f"Stim Amplitude: {self.pending_stim_amplitude:.2f}uA")
         except ValueError:
             self.log_event("Invalid input for Stimulation Amplitude")
 
     def update_pulse_width(self, event):
+        """Update the pending pulse width from the entry box."""
         try:
             value = float(self.pulse_width_entry.get())
-            self.pulse_width = value
-            self.pulse_width_var.set(f"Pulse Width: {self.pulse_width:.2f}")
-            self.log_event(f"Set Pulse Width to {self.pulse_width:.2f}")
-            if self.pc_usr_toggle == 1:
-                self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
+            self.pending_pulse_width = value
+            self.pulse_width_var.set(f"Pulse Width: {self.pending_pulse_width:.2f}")
         except ValueError:
             self.log_event("Invalid input for Pulse Width")
 
