@@ -210,15 +210,12 @@ class AppUI:
             self.uart.set_pulse_width(self.pulse_width)
 
     def STOP(self):
-        try:
-            if self.uart:
-                ack = self.uart.STOP()
-            if ack:
-                self.log_event("STIMULATION STOPPED")
-            else:
-                self.log_event("STOP ACK not received")
-        except Exception as e:
-            pass
+        if self.uart:
+            ack = self.uart.STOP()
+        if ack:
+            self.log_event("STIMULATION STOPPED")
+        else:
+            self.log_event("STOP ACK not received")
 
     def toggle_trigger(self):
         if self.uart:
@@ -354,14 +351,20 @@ class AppUI:
             self.monitor_thread_running = False  # Signal the thread to stop
             self.monitor_thread.join()  # Wait for the thread to finish
 
-        # Close UART connection
+        # Close UART connection if it exists
         if self.uart:
-            self.STOP()
-            self.uart.close()
+            try:
+                self.STOP()
+                self.uart.close()
+            except Exception as e:
+                self.log_event(f"Error closing control board connection: {e}")
 
-        # Close user board connection
+        # Close user board connection if it exists
         if self.user_board:
-            self.user_board.close()
+            try:
+                self.user_board.close()
+            except Exception as e:
+                self.log_event(f"Error closing user board connection: {e}")
 
         # Destroy the main window
         self.master.destroy()
