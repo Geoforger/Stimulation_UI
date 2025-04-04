@@ -21,7 +21,7 @@ class AppUI:
 
         # Initialize device connections
         self.uart = None  # Control board connection
-        self.user_board = None  # User board connection
+        self.user_board = None  # User board connection (initialized to None)
 
         # Initialize serial numbers
         self.control_board_serial = None
@@ -113,7 +113,7 @@ class AppUI:
         self.event_log.grid(row=0, column=3, rowspan=14, padx=10, pady=10)
 
         # Initialize serial communication
-            # Device serial numbers
+        # Device serial numbers
         self.control_board_serial = None
         self.user_board_serial = None
         self.uart = None
