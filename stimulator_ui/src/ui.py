@@ -210,12 +210,15 @@ class AppUI:
             self.uart.set_pulse_width(self.pulse_width)
 
     def STOP(self):
-        if self.uart:
-            ack = self.uart.STOP()
-        if ack:
-            self.log_event("STIMULATION STOPPED")
-        else:
-            self.log_event("STOP ACK not received")
+        try:
+            if self.uart:
+                ack = self.uart.STOP()
+            if ack:
+                self.log_event("STIMULATION STOPPED")
+            else:
+                self.log_event("STOP ACK not received")
+        except Exception as e:
+            pass
 
     def toggle_trigger(self):
         if self.uart:
