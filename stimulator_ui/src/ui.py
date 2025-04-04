@@ -30,6 +30,10 @@ class AppUI:
         # Initialize PC/User toggle state
         self.pc_usr_toggle = 1
 
+        # Event log
+        self.event_log = Text(master, width=80, height=20)
+        self.event_log.grid(row=0, column=3, rowspan=14, padx=10, pady=10)
+
         # Load serial numbers and initialize connections
         self.load_serial_numbers()
         self.initialize_serial()
