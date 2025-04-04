@@ -5,6 +5,7 @@ from user_io import USER_COMMS
 import serial
 import serial.tools.list_ports
 import os
+import threading
 
 class AppUI:
     def __init__(self, master):
@@ -104,6 +105,7 @@ class AppUI:
         self.load_serial_numbers()
         self.initialize_serial()
         self.initialise_user_board()
+        self.start_connection_monitor()  # Start monitoring connections
 
     def load_serial_numbers(self):
             """Load the serial numbers of the control and user boards from the device_serials.txt file."""
@@ -367,6 +369,36 @@ class AppUI:
                 self.log_event(f"Poll Status Response: {response}")
             except Exception as e:
                 self.log_event(f"Error polling status: {e}")
+
+    def start_connection_monitor(self):
+        """Start a background thread to monitor the connection status of the boards."""
+        self.monitor_thread = threading.Thread(target=self.monitor_connections, daemon=True)
+        self.monitor_thread.start()
+
+    def monitor_connections(self):
+        """Periodically check the connection status of the control and user boards."""
+        while True:
+            self.check_control_board_connection()
+            self.check_user_board_connection()
+            self.master.after(1000)  # Check every 1 second
+
+    def check_control_board_connection(self):
+        """Check if the control board is still connected."""
+        port = self.find_port_by_serial(self.control_board_serial)
+        if not port and self.uart:
+            self.log_event("Control board disconnected.")
+            self.uart = None
+            self.disable_ui()
+            self.reconnect_but.config(state=NORMAL)
+
+    def check_user_board_connection(self):
+        """Check if the user board is still connected."""
+        port = self.find_port_by_serial(self.user_board_serial)
+        if not port and self.user_board:
+            self.log_event("User board disconnected.")
+            self.user_board = None
+            self.pc_user_switch.config(state=DISABLED)
+            self.reconnect_user_but.config(state=NORMAL)
 
 if __name__ == "__main__":
     root = Tk()
