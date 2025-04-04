@@ -345,20 +345,23 @@ class AppUI:
         self.poll_status_but.config(state=NORMAL)
 
     def close(self):
+        """Close the application and clean up resources."""
+        # Stop the connection monitoring thread
+        if hasattr(self, "monitor_thread") and self.monitor_thread.is_alive():
+            self.monitor_thread_running = False  # Signal the thread to stop
+            self.monitor_thread.join()  # Wait for the thread to finish
+
+        # Close UART connection
         if self.uart:
             self.STOP()
             self.uart.close()
-        self.master.destroy()
 
-    def find_arduino_port(self):
-        # List all available ports
-        ports = list(serial.tools.list_ports.comports())
-        for port in ports:
-            # Check if "Arduino" appears in the description
-            # or if the device name matches common Arduino naming conventions.
-            if "Arduino" in port.description or port.device.startswith("/dev/ttyACM") or port.device.startswith("/dev/ttyUSB"):
-                return port.device
-        return None
+        # Close user board connection
+        if self.user_board:
+            self.user_board.close()
+
+        # Destroy the main window
+        self.master.destroy()
     
     def poll_status(self):
         """Send an <ACK> message to the serial device and log the response."""
