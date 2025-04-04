@@ -12,12 +12,29 @@ class AppUI:
         self.master = master
         master.title("Test Stimulator App") 
 
-        # UI Display variables
+        # Initialize variables
         self.stim_amplitude = 0.00
         self.pulse_width = 0.00
         self.pending_stim_amplitude = 0.00
         self.pending_pulse_width = 0.00
         self.nerve_impedance = 0.00
+
+        # Initialize device connections
+        self.uart = None  # Control board connection
+        self.user_board = None  # User board connection
+
+        # Initialize serial numbers
+        self.control_board_serial = None
+        self.user_board_serial = None
+
+        # Initialize PC/User toggle state
+        self.pc_usr_toggle = 1
+
+        # Load serial numbers and initialize connections
+        self.load_serial_numbers()
+        self.initialize_serial()
+        self.initialise_user_board()
+        self.start_connection_monitor()  # Start monitoring connections
 
         # Display Labels
         self.stim_amplitude_var = StringVar()
@@ -386,7 +403,8 @@ class AppUI:
 
     def monitor_connections(self):
         """Periodically check the connection status of the control and user boards."""
-        while True:
+        self.monitor_thread_running = True
+        while self.monitor_thread_running:
             self.check_control_board_connection()
             self.check_user_board_connection()
             self.master.after(1000)  # Check every 1 second
