@@ -133,44 +133,48 @@ class AppUI:
         """Initialize the connection to the control board."""
         if not self.control_board_serial:
             self.log_event("Error: Control board serial number not found.")
+            self.reconnect_but.config(state=NORMAL)  # Enable reconnect button for control board
             return
 
         port = self.find_port_by_serial(self.control_board_serial)
         if not port:
             self.log_event("Error: Control board not found. Please check the connection.")
+            self.reconnect_but.config(state=NORMAL)  # Enable reconnect button for control board
             return
 
         try:
             self.uart = UART_COMMS(port=port, baudrate=9600)
             self.pc_usr_toggle = self.uart.comm_state
             self.enable_ui()
-            self.reconnect_but.config(state=DISABLED)
+            self.reconnect_but.config(state=DISABLED)  # Disable reconnect button for control board
             self.log_event(f"Control board connected on port {port}.")
         except Exception as e:
             self.log_event(f"Failed to connect to control board: {e}")
             self.disable_ui()
-            self.reconnect_but.config(state=NORMAL)
+            self.reconnect_but.config(state=NORMAL)  # Enable reconnect button for control board
 
     def initialise_user_board(self):
         """Initialize the connection to the user board."""
         if not self.user_board_serial:
             self.log_event("Error: User board serial number not found.")
+            self.reconnect_user_but.config(state=NORMAL)  # Enable reconnect button for user board
             return
 
         port = self.find_port_by_serial(self.user_board_serial)
         if not port:
             self.log_event("Error: User board not found. Please check the connection.")
+            self.reconnect_user_but.config(state=NORMAL)  # Enable reconnect button for user board
             return
 
         try:
             self.user_board = USER_COMMS(port=port, baudrate=9600)
-            self.reconnect_user_but.config(state=DISABLED)
-            self.pc_user_switch.config(state=NORMAL)
+            self.reconnect_user_but.config(state=DISABLED)  # Disable reconnect button for user board
+            self.pc_user_switch.config(state=NORMAL)  # Enable PC/User switch
             self.log_event(f"User board connected on port {port}.")
         except Exception as e:
             self.log_event(f"Failed to connect to user board: {e}")
-            self.reconnect_user_but.config(state=NORMAL)
-            self.pc_user_switch.config(state=DISABLED)
+            self.reconnect_user_but.config(state=NORMAL)  # Enable reconnect button for user board
+            self.pc_user_switch.config(state=DISABLED)  # Disable PC/User switch
 
     def log_event(self, event):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -255,6 +259,7 @@ class AppUI:
         self.pulse_width_entry.config(state=DISABLED)
         self.triggers_switch.config(state=DISABLED)
         self.pc_user_switch.config(state=DISABLED)
+        self.done_but.config(state=DISABLED)
 
     def stimulation_ui(self):
         self.stim_up_but.config(state=NORMAL)
