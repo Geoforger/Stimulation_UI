@@ -4,6 +4,7 @@ from stim_io import UART_COMMS
 from user_io import USER_COMMS
 import serial
 import serial.tools.list_ports
+import os
 
 class AppUI:
     def __init__(self, master):
@@ -94,36 +95,80 @@ class AppUI:
         self.event_log.grid(row=0, column=3, rowspan=14, padx=10, pady=10)
 
         # Initialize serial communication
+            # Device serial numbers
+        self.control_board_serial = None
+        self.user_board_serial = None
         self.uart = None
+
         self.pc_usr_toggle = 1
+        self.load_serial_numbers()
         self.initialize_serial()
         self.initialise_user_board()
 
+    def load_serial_numbers(self):
+            """Load the serial numbers of the control and user boards from the device_serials.txt file."""
+            if not os.path.exists("device_serials.txt"):
+                self.log_event("Error: device_serials.txt not found. Please run the serial_search script.")
+                return
+
+            with open("device_serials.txt", "r") as file:
+                lines = file.readlines()
+                for line in lines:
+                    if "Control Board Serial" in line:
+                        self.control_board_serial = line.split(":")[1].strip()
+                    elif "User Board Serial" in line:
+                        self.user_board_serial = line.split(":")[1].strip()
+
+            self.log_event(f"Loaded serial numbers:\nControl Board: {self.control_board_serial}\nUser Board: {self.user_board_serial}")
+
+    def find_port_by_serial(self, serial_number):
+        """Find the port associated with a given serial number."""
+        ports = list(serial.tools.list_ports.comports())
+        for port in ports:
+            if port.serial_number == serial_number:
+                return port.device
+        return None
+
     def initialize_serial(self):
+        """Initialize the connection to the control board."""
+        if not self.control_board_serial:
+            self.log_event("Error: Control board serial number not found.")
+            return
+
+        port = self.find_port_by_serial(self.control_board_serial)
+        if not port:
+            self.log_event("Error: Control board not found. Please check the connection.")
+            return
+
         try:
-            # port = self.find_arduino_port()
-            # self.uart = UART_COMMS(port=port)
-            self.uart = UART_COMMS(port='/dev/ttyACM0', baudrate=9600)  # Currently the default port found on pi
+            self.uart = UART_COMMS(port=port, baudrate=9600)
             self.pc_usr_toggle = self.uart.comm_state
             self.enable_ui()
             self.reconnect_but.config(state=DISABLED)
-            self.log_event("Serial connection established")
+            self.log_event(f"Control board connected on port {port}.")
         except Exception as e:
-            self.log_event(f"Failed to establish serial connection: {e}")
+            self.log_event(f"Failed to connect to control board: {e}")
             self.disable_ui()
             self.reconnect_but.config(state=NORMAL)
 
     def initialise_user_board(self):
+        """Initialize the connection to the user board."""
+        if not self.user_board_serial:
+            self.log_event("Error: User board serial number not found.")
+            return
+
+        port = self.find_port_by_serial(self.user_board_serial)
+        if not port:
+            self.log_event("Error: User board not found. Please check the connection.")
+            return
+
         try:
-            self.user_board = USER_COMMS(port='/dev/ttyS0', baudrate=9600)
-            self.user_board_connected = True
-            self.enable_ui()
+            self.user_board = USER_COMMS(port=port, baudrate=9600)
             self.reconnect_user_but.config(state=DISABLED)
             self.pc_user_switch.config(state=NORMAL)
-            self.log_event("User board connection established")
+            self.log_event(f"User board connected on port {port}.")
         except Exception as e:
-            self.user_board_connected = False
-            self.log_event(f"Failed to establish user board connection: {e}")
+            self.log_event(f"Failed to connect to user board: {e}")
             self.reconnect_user_but.config(state=NORMAL)
             self.pc_user_switch.config(state=DISABLED)
 
