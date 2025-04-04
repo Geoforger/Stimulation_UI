@@ -2,6 +2,7 @@ from tkinter import Tk, Button, Checkbutton, IntVar, Label, StringVar, Text, Ent
 from datetime import datetime
 from stim_io import UART_COMMS
 from user_io import USER_COMMS
+import serial
 import serial.tools.list_ports
 import os
 import threading
@@ -9,35 +10,14 @@ import threading
 class AppUI:
     def __init__(self, master):
         self.master = master
-        master.title("Test Stimulator App")
+        master.title("Test Stimulator App") 
 
-        # Initialize variables
+        # UI Display variables
         self.stim_amplitude = 0.00
         self.pulse_width = 0.00
         self.pending_stim_amplitude = 0.00
         self.pending_pulse_width = 0.00
         self.nerve_impedance = 0.00
-
-        # Initialize device connections
-        self.control_board = None  # Control board connection
-        self.user_board = None  # User board connection
-
-        # Initialize serial numbers
-        self.control_board_serial = None
-        self.user_board_serial = None
-
-        # Initialize PC/User toggle state
-        self.pc_user_toggle = 1
-
-        # Event log
-        self.event_log = Text(master, width=80, height=20)
-        self.event_log.grid(row=0, column=3, rowspan=14, padx=10, pady=10)
-
-        # Load serial numbers and initialize connections
-        self.load_serial_numbers()
-        self.initialize_control_board()
-        self.initialize_user_board()
-        self.start_connection_monitor()  # Start monitoring connections
 
         # Display Labels
         self.stim_amplitude_var = StringVar()
@@ -75,12 +55,12 @@ class AppUI:
         self.STOP_but.grid(row=4, column=2, rowspan=3, padx=10, pady=10)
 
         # Reconnect button
-        self.reconnect_control_board_button = Button(master, text="Reconnect Control Board", command=self.initialize_control_board, state=NORMAL)
-        self.reconnect_control_board_button.grid(row=6, column=2, rowspan=3, padx=10, pady=10)
+        self.reconnect_but = Button(master, text="Reconnect", command=self.initialize_serial, state=NORMAL)
+        self.reconnect_but.grid(row=6, column=2, rowspan=3, padx=10, pady=10)
 
         # Reconnect User Board button
-        self.reconnect_user_board_button = Button(master, text="Reconnect User Board", command=self.initialize_user_board, state=DISABLED)
-        self.reconnect_user_board_button.grid(row=7, column=2, rowspan=3, padx=10, pady=10)
+        self.reconnect_user_but = Button(master, text="Reconnect User Board", command=self.initialise_user_board, state=DISABLED)
+        self.reconnect_user_but.grid(row=7, column=2, rowspan=3, padx=10, pady=10)
 
         # Poll Status button
         self.poll_status_but = Button(master, text="Poll Status", command=self.poll_status, width=10, height=2, state=DISABLED)
@@ -116,32 +96,32 @@ class AppUI:
         self.event_log.grid(row=0, column=3, rowspan=14, padx=10, pady=10)
 
         # Initialize serial communication
-        # Device serial numbers
+            # Device serial numbers
         self.control_board_serial = None
         self.user_board_serial = None
         self.uart = None
 
         self.pc_usr_toggle = 1
         self.load_serial_numbers()
-        self.initialize_control_board()
-        self.initialize_user_board()
+        self.initialize_serial()
+        self.initialise_user_board()
         self.start_connection_monitor()  # Start monitoring connections
 
     def load_serial_numbers(self):
-        """Load the serial numbers of the control and user boards from the device_serials.txt file."""
-        if not os.path.exists("device_serials.txt"):
-            self.log_event("Error: device_serials.txt not found. Please run the serial_search script.")
-            return
+            """Load the serial numbers of the control and user boards from the device_serials.txt file."""
+            if not os.path.exists("device_serials.txt"):
+                self.log_event("Error: device_serials.txt not found. Please run the serial_search script.")
+                return
 
-        with open("device_serials.txt", "r") as file:
-            lines = file.readlines()
-            for line in lines:
-                if "Control Board Serial" in line:
-                    self.control_board_serial = line.split(":")[1].strip()
-                elif "User Board Serial" in line:
-                    self.user_board_serial = line.split(":")[1].strip()
+            with open("device_serials.txt", "r") as file:
+                lines = file.readlines()
+                for line in lines:
+                    if "Control Board Serial" in line:
+                        self.control_board_serial = line.split(":")[1].strip()
+                    elif "User Board Serial" in line:
+                        self.user_board_serial = line.split(":")[1].strip()
 
-        self.log_event(f"Loaded serial numbers:\nControl Board: {self.control_board_serial}\nUser Board: {self.user_board_serial}")
+            self.log_event(f"Loaded serial numbers:\nControl Board: {self.control_board_serial}\nUser Board: {self.user_board_serial}")
 
     def find_port_by_serial(self, serial_number):
         """Find the port associated with a given serial number."""
@@ -151,53 +131,54 @@ class AppUI:
                 return port.device
         return None
 
-    def initialize_control_board(self):
+    def initialize_serial(self):
         """Initialize the connection to the control board."""
         if not self.control_board_serial:
             self.log_event("Error: Control board serial number not found.")
-            self.reconnect_control_board_button.config(state=NORMAL)
+            self.reconnect_but.config(state=NORMAL)  # Enable reconnect button for control board
             return
 
         port = self.find_port_by_serial(self.control_board_serial)
         if not port:
             self.log_event("Error: Control board not found. Please check the connection.")
-            self.reconnect_control_board_button.config(state=NORMAL)
+            self.reconnect_but.config(state=NORMAL)  # Enable reconnect button for control board
             return
 
         try:
-            self.control_board = UART_COMMS(port=port, baudrate=9600)
-            self.pc_user_toggle = self.control_board.comm_state
+            self.uart = UART_COMMS(port=port, baudrate=9600)
+            self.pc_usr_toggle = self.uart.comm_state
             self.enable_ui()
-            self.reconnect_control_board_button.config(state=DISABLED)
+            self.reconnect_but.config(state=DISABLED)  # Disable reconnect button for control board
             self.log_event(f"Control board connected on port {port}.")
         except Exception as e:
             self.log_event(f"Failed to connect to control board: {e}")
             self.disable_ui()
-            self.reconnect_control_board_button.config(state=NORMAL)
+            self.reconnect_but.config(state=NORMAL)  # Enable reconnect button for control board
 
-    def initialize_user_board(self):
+    def initialise_user_board(self):
         """Initialize the connection to the user board."""
         if not self.user_board_serial:
             self.log_event("Error: User board serial number not found.")
-            self.reconnect_user_board_button.config(state=NORMAL)
+            self.reconnect_user_but.config(state=NORMAL)  # Enable reconnect button for user board
             return
 
         port = self.find_port_by_serial(self.user_board_serial)
         if not port:
             self.log_event("Error: User board not found. Please check the connection.")
-            self.reconnect_user_board_button.config(state=NORMAL)
+            self.reconnect_user_but.config(state=NORMAL)  # Enable reconnect button for user board
             return
 
         try:
             self.user_board = USER_COMMS(port=port, baudrate=9600)
-            self.reconnect_user_board_button.config(state=DISABLED)
+            self.reconnect_user_but.config(state=DISABLED)  # Disable reconnect button for user board
+            self.pc_user_switch.config(state=NORMAL)  # Enable PC/User switch
             self.log_event(f"User board connected on port {port}.")
         except Exception as e:
             self.log_event(f"Failed to connect to user board: {e}")
-            self.reconnect_user_board_button.config(state=NORMAL)
+            self.reconnect_user_but.config(state=NORMAL)  # Enable reconnect button for user board
+            self.pc_user_switch.config(state=DISABLED)  # Disable PC/User switch
 
     def log_event(self, event):
-        """Log an event to the event log."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.event_log.insert(END, f"{timestamp} - {event}\n")
         self.event_log.see(END)
@@ -224,29 +205,29 @@ class AppUI:
         self.stim_amplitude = self.pending_stim_amplitude
         self.pulse_width = self.pending_pulse_width
         self.log_event(f"Applied settings: Stim Amplitude = {self.stim_amplitude:.2f}uA\n Pulse Width = {self.pulse_width:.2f}")
-        if self.control_board:
-            self.control_board.set_stim_amplitude(self.stim_amplitude)
-            self.control_board.set_pulse_width(self.pulse_width)
+        if self.uart:
+            self.uart.set_stim_amplitude(self.stim_amplitude)
+            self.uart.set_pulse_width(self.pulse_width)
 
     def STOP(self):
-        if self.control_board:
-            ack = self.control_board.STOP()
+        if self.uart:
+            ack = self.uart.STOP()
         if ack:
             self.log_event("STIMULATION STOPPED")
         else:
             self.log_event("STOP ACK not received")
 
     def toggle_trigger(self):
-        if self.control_board:
-            self.control_board.toggle_trigger()
+        if self.uart:
+            self.uart.toggle_trigger()
         if self.switch_var.get():
             self.log_event("INTERNAL TRIGGERS")
         else:
             self.log_event("EXTERNAL TRIGGERS")
 
     def toggle_recording(self):
-        if self.control_board:
-            self.control_board.toggle_recording()
+        if self.uart:
+            self.uart.toggle_recording()
         if self.recording_switch_var.get():
             self.log_event("Recording Mode Enabled")
             self.recording_ui()
@@ -258,10 +239,10 @@ class AppUI:
         if not self.user_board_connected:
             self.log_event("Cannot toggle PC/User mode: User board not connected")
             return
-        if self.control_board:
-            ack = self.control_board.toggle_PC_usr()
+        if self.uart:
+            ack = self.uart.toggle_PC_usr()
         if ack:
-            self.pc_user_toggle ^= 1
+            self.pc_usr_toggle ^= 1
             if self.pc_user_switch_var.get():
                 self.log_event("PC Mode Enabled")
                 self.pc_mode_ui()
@@ -320,8 +301,8 @@ class AppUI:
             self.stim_amplitude = value
             self.stim_amplitude_var.set(f"Stim Amplitude: {self.stim_amplitude:.2f}uA")
             self.log_event(f"Set Stimulation Amplitude to {self.stim_amplitude:.2f}uA")
-            if self.pc_user_toggle == 1:
-                self.control_board.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
+            if self.pc_usr_toggle == 1:
+                self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
         except ValueError:
             self.log_event("Invalid input for Stimulation Amplitude")
 
@@ -331,8 +312,8 @@ class AppUI:
             self.pulse_width = value
             self.pulse_width_var.set(f"Pulse Width: {self.pulse_width:.2f}")
             self.log_event(f"Set Pulse Width to {self.pulse_width:.2f}")
-            if self.pc_user_toggle == 1:
-                self.control_board.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
+            if self.pc_usr_toggle == 1:
+                self.uart.write(f"{self.stim_amplitude},{self.pulse_width}\n".encode('utf-8'))
         except ValueError:
             self.log_event("Invalid input for Pulse Width")
 
@@ -364,36 +345,17 @@ class AppUI:
         self.poll_status_but.config(state=NORMAL)
 
     def close(self):
-        """Close the application and clean up resources."""
-        # Stop the connection monitoring thread
-        if hasattr(self, "monitor_thread") and self.monitor_thread.is_alive():
-            self.monitor_thread_running = False
-            self.monitor_thread.join()
-
-        # Close control board connection if it exists
-        if self.control_board:
-            try:
-                self.STOP()
-                self.control_board.close()
-            except Exception as e:
-                self.log_event(f"Error closing control board connection: {e}")
-
-        # Close user board connection if it exists
-        if self.user_board:
-            try:
-                self.user_board.close()
-            except Exception as e:
-                self.log_event(f"Error closing user board connection: {e}")
-
-        # Destroy the main window
+        if self.uart:
+            self.STOP()
+            self.uart.close()
         self.master.destroy()
     
     def poll_status(self):
         """Send an <ACK> message to the serial device and log the response."""
-        if self.control_board:
+        if self.uart:
             try:
-                self.control_board.write(b"<ACK>")
-                response = self.control_board.readline().decode('utf-8').strip()
+                self.uart.write(b"<ACK>")
+                response = self.uart.readline().decode('utf-8').strip()
                 self.log_event(f"Poll Status Response: {response}")
             except Exception as e:
                 self.log_event(f"Error polling status: {e}")
@@ -405,8 +367,7 @@ class AppUI:
 
     def monitor_connections(self):
         """Periodically check the connection status of the control and user boards."""
-        self.monitor_thread_running = True
-        while self.monitor_thread_running:
+        while True:
             self.check_control_board_connection()
             self.check_user_board_connection()
             self.master.after(1000)  # Check every 1 second
@@ -414,11 +375,11 @@ class AppUI:
     def check_control_board_connection(self):
         """Check if the control board is still connected."""
         port = self.find_port_by_serial(self.control_board_serial)
-        if not port and self.control_board:
+        if not port and self.uart:
             self.log_event("Control board disconnected.")
-            self.control_board = None
+            self.uart = None
             self.disable_ui()
-            self.reconnect_control_board_button.config(state=NORMAL)
+            self.reconnect_but.config(state=NORMAL)
 
     def check_user_board_connection(self):
         """Check if the user board is still connected."""
@@ -427,7 +388,7 @@ class AppUI:
             self.log_event("User board disconnected.")
             self.user_board = None
             self.pc_user_switch.config(state=DISABLED)
-            self.reconnect_user_board_button.config(state=NORMAL)
+            self.reconnect_user_but.config(state=NORMAL)
 
 if __name__ == "__main__":
     root = Tk()
