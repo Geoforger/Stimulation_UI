@@ -39,11 +39,9 @@ If you are looking to install to your own Raspberry Pi, without reformatting, fo
 
 ## Usage
 
-This app expects a connection between the systems' switching board MCU and the Raspberry Pi GPIO pins according to the circuit diagram below. This is to allow for simple UART communication between the UI and the system.
+This app expects a connection between the systems' switching board MCU and the Raspberry Pi via USB. The user board will also be connected to the Pi via USB.
 
-CIRCUIT DIAGRAM HERE
-
-Once you have made these connections, launch the app. It will launch displaying the following interface:
+Before launching the UI, run the ***serial_search*** script and follow the onscreen instructions. This program allows the system to identify the control board and user board that you have connected. This is done so that subsequent uses of the system do not require setup. This script should be run each time a different Pi, switching board, or user board are used in this system.
 
 IMAGE OF UI
 
