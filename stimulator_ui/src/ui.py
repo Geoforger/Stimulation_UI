@@ -100,6 +100,7 @@ class AppUI:
         self.control_board_serial = None
         self.user_board_serial = None
         self.uart = None
+        self.user_board = None
 
         self.pc_usr_toggle = 1
         self.load_serial_numbers()
@@ -361,16 +362,14 @@ class AppUI:
                 self.log_event(f"Error polling status: {e}")
 
     def start_connection_monitor(self):
-        """Start a background thread to monitor the connection status of the boards."""
-        self.monitor_thread = threading.Thread(target=self.monitor_connections, daemon=True)
-        self.monitor_thread.start()
+        """Start monitoring the connection status of the boards."""
+        self.monitor_connections()  # Start the periodic connection monitoring
 
     def monitor_connections(self):
         """Periodically check the connection status of the control and user boards."""
-        while True:
-            self.check_control_board_connection()
-            self.check_user_board_connection()
-            self.master.after(1000)  # Check every 1 second
+        self.check_control_board_connection()
+        self.check_user_board_connection()
+        self.master.after(1000, self.monitor_connections)  # Schedule the next check after 1 second
 
     def check_control_board_connection(self):
         """Check if the control board is still connected."""
