@@ -237,7 +237,7 @@ class AppUI:
             self.stimulation_ui()
 
     def toggle_pc_user(self):
-        if not self.user_board_connected:
+        if not self.user_board:
             self.log_event("Cannot toggle PC/User mode: User board not connected")
             return
         if self.uart:
